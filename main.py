@@ -1,12 +1,12 @@
-    import telebot
+import telebot
 import openai
 import json
 import os
 
 TOKEN = "8517879791:AAG0cpkLrpArAJebmv1m7Ec00fHKLZhDnkY"         # from BotFather
 OPENAI_API_KEY = "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" # from OpenAI
-bot = telebot.TeleBot(8517879791:AAG0cpkLrpArAJebmv1m7Ec00fHKLZhDnkY)
-openai.api_key = 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
+bot = telebot.TeleBot(TOKEN)
+openai.api_key = OPENAI_API_KEY
 
 DATA_FILE = "haytam_data.json"
 
