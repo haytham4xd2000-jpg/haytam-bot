@@ -1,1 +1,2 @@
-TOKEN = "8517879791:AAG0cpkLrpArAJebmv1m7Ec00fHKLZhDnkY"
+print("Haytam v4 is running 🔥")
+bot.infinity_polling()
