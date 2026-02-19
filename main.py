@@ -1,15 +1,16 @@
 import telebot
-import openai
 import json
 import os
+import random
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
-TOKEN = "8517879791:AAG0cpkLrpArAJebmv1m7Ec00fHKLZhDnkY"         # from BotFather
-OPENAI_API_KEY = "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" # from OpenAI
+# ---------------- CONFIG ----------------
+TOKEN = "8517879791:AAG0cpkLrpArAJebmv1m7Ec00fHKLZhDnkY"  # From BotFather
 bot = telebot.TeleBot(TOKEN)
-openai.api_key = OPENAI_API_KEY
-
 DATA_FILE = "haytam_data.json"
 
+# ---------------- LOAD DATA ----------------
 if os.path.exists(DATA_FILE):
     with open(DATA_FILE, "r") as f:
         user_memory = json.load(f)
@@ -23,27 +24,23 @@ def save_data():
 def get_level(xp):
     return xp // 10 + 1
 
+# ---------------- LOAD HUGGING FACE MODEL ----------------
+model_name = "TheBloke/MPT-7B-Chat-GGUF"  # Free chat model
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", torch_dtype=torch.float16)
+
 def get_ai_reply(name, text):
+    prompt = f"You are Haytam, a friendly Moroccan teen chatbot. Talk like a Moroccan bro with short fun replies and emojis. User's name is {name}. Reply naturally to: {text}"
     try:
-        prompt = f"""
-You are Haytam, a friendly Moroccan teen chatbot.
-Talk like a Moroccan bro with emojis and short fun replies.
-User's name is {name}.
-Reply naturally to: "{text}"
-"""
-        response = openai.Completion.create(
-            engine="text-davinci-003",
-            prompt=prompt,
-            temperature=0.7,
-            max_tokens=80
-        )
-        reply = response.choices[0].text.strip()
-        if reply == "":
-            return "Hmm 🤔 I hear you, tell me more!"
+        inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
+        output = model.generate(**inputs, max_new_tokens=80)
+        reply = tokenizer.decode(output[0], skip_special_tokens=True)
         return reply
     except:
-        return "Hmm 🤔 I can't think right now, but I'm here 😎"
+        fallback = ["Hmm 🤔 I hear you, tell me more!", "Interesting 😏 keep talking!", "I hear you 🔥"]
+        return random.choice(fallback)
 
+# ---------------- COMMANDS ----------------
 @bot.message_handler(commands=['start'])
 def start(message):
     chat_id = str(message.chat.id)
@@ -52,6 +49,30 @@ def start(message):
         save_data()
     bot.reply_to(message, "Salam 😎 Ana Haytam! Shno smitek?")
 
+@bot.message_handler(commands=['profile'])
+def profile(message):
+    chat_id = str(message.chat.id)
+    user = user_memory.get(chat_id)
+    if user:
+        level = get_level(user["xp"])
+        bot.reply_to(message,
+            f"👤 Name: {user['name']}\n"
+            f"⭐ XP: {user['xp']}\n"
+            f"🏆 Level: {level}\n"
+            f"⚽ Favorite Team: {user['team']}"
+        )
+
+@bot.message_handler(commands=['leaderboard'])
+def leaderboard(message):
+    leaderboard_list = sorted(user_memory.items(), key=lambda x: x[1]["xp"], reverse=True)[:10]
+    text = "🏆 Haytam Leaderboard:\n\n"
+    for i, (chat_id, user) in enumerate(leaderboard_list, start=1):
+        level = get_level(user["xp"])
+        name = user.get("name", "Unknown")
+        text += f"{i}. {name} - Level {level} ({user['xp']} XP)\n"
+    bot.reply_to(message, text)
+
+# ---------------- MAIN CHAT ----------------
 @bot.message_handler(func=lambda message: True)
 def chat(message):
     chat_id = str(message.chat.id)
@@ -59,15 +80,18 @@ def chat(message):
     if chat_id not in user_memory:
         user_memory[chat_id] = {"name": None, "xp":0, "team": None}
     user = user_memory[chat_id]
+
     if user["name"] is None:
         user["name"] = text
         save_data()
         bot.reply_to(message, f"Zwin 🔥 Mr7ba bik {text}!")
         return
+
     user["xp"] += 1
     save_data()
     reply = get_ai_reply(user["name"], text)
     bot.reply_to(message, reply)
 
-print("Haytam AI is running 🔥")
+# ---------------- START BOT ----------------
+print("Haytam Free AI is running 🔥")
 bot.infinity_polling()
